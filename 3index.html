@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Gökalp Emlak Yönetim Paneli</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f4f9; padding: 20px; display: flex; gap: 20px; }
+        .sol-panel, .sag-panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .sol-panel { width: 30%; height: fit-content; border-top: 5px solid #2ecc71; position: sticky; top: 20px; }
+        .sag-panel { width: 70%; border-top: 5px solid #3498db; }
+        
+        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
+        .btn-ekle { width: 100%; background-color: #2ecc71; color: white; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        
+        .ilan-kutu { border: 1px solid #eee; padding: 15px; margin-bottom: 15px; border-radius: 8px; position: relative; background: #fff; transition: 0.3s; }
+        .ilan-kutu:hover { border-color: #3498db; }
+        .fiyat { color: #27ae60; font-size: 22px; font-weight: bold; }
+        
+        /* Buton Grubu */
+        .islem-butonlari { margin-top: 10px; display: flex; gap: 10px; }
+        .btn-sil { background: #e74c3c; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; }
+        .btn-guncelle { background: #f39c12; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; }
+        
+        .bildirim { margin-top: 10px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="sol-panel">
+        <h2>🏠 Yeni İlan</h2>
+        <input type="text" id="baslik" placeholder="Başlık">
+        <input type="number" id="fiyat" placeholder="Fiyat">
+        <input type="text" id="odaSayisi" placeholder="Oda Sayısı">
+        <input type="number" id="metrekare" placeholder="Metrekare">
+        <button class="btn-ekle" onclick="ilanEkle()">Kaydet</button>
+        <div id="bildirim" class="bildirim"></div>
+    </div>
+
+    <div class="sag-panel">
+        <h2>📋 İlan Listesi</h2>
+        <div id="ilan-listesi">Yükleniyor...</div>
+    </div>
+
+    <script>
+        const API_URL =  'https://gokalp-emlak-api.onrender.com/ilanlar';
+        window.onload = ilanlariGetir;
+
+        // 1. LİSTELEME
+        async function ilanlariGetir() {
+            const listeDiv = document.getElementById('ilan-listesi');
+            try {
+                const cevap = await fetch(API_URL);
+                const ilanlar = await cevap.json();
+                listeDiv.innerHTML = ilanlar.length === 0 ? "<p>Henüz ilan yok.</p>" : "";
+                
+                ilanlar.forEach(ilan => {
+                    listeDiv.innerHTML += `
+                        <div class="ilan-kutu" id="ilan-${ilan._id}">
+                            <h3 style="margin:0">${ilan.baslik}</h3>
+                            <p class="fiyat">${ilan.fiyat.toLocaleString('tr-TR')} TL</p>
+                            <p>Oda: ${ilan.odaSayisi} | ${ilan.metrekare} m²</p>
+                            <div class="islem-butonlari">
+                                <button class="btn-guncelle" onclick="fiyatGuncelle('${ilan._id}', ${ilan.fiyat})">Fiyatı Güncelle</button>
+                                <button class="btn-sil" onclick="ilanSil('${ilan._id}')">Sil</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (hata) { listeDiv.innerHTML = "Bağlantı hatası!"; }
+        }
+
+        // 2. EKLEME
+        async function ilanEkle() {
+            const veri = {
+                baslik: document.getElementById('baslik').value,
+                fiyat: Number(document.getElementById('fiyat').value),
+                odaSayisi: document.getElementById('odaSayisi').value,
+                metrekare: Number(document.getElementById('metrekare').value)
+            };
+            const cevap = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(veri)
+            });
+            if(cevap.ok) { ilanlariGetir(); temizle(); }
+            else { alert("Hata: " + (await cevap.json()).message); }
+        }
+
+        // 3. SİLME (YENİ!)
+        async function ilanSil(id) {
+            if(!confirm("Bu ilanı silmek istediğine emin misin?")) return;
+            const cevap = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+            if(cevap.ok) { ilanlariGetir(); }
+        }
+
+        // 4. GÜNCELLEME (YENİ!)
+        async function fiyatGuncelle(id, eskiFiyat) {
+            const yeniFiyat = prompt("Yeni fiyatı giriniz:", eskiFiyat);
+            if (!yeniFiyat || yeniFiyat == eskiFiyat) return;
+
+            const cevap = await fetch(`${API_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fiyat: Number(yeniFiyat) })
+            });
+            if(cevap.ok) { ilanlariGetir(); }
+        }
+
+        function temizle() {
+            ['baslik', 'fiyat', 'odaSayisi', 'metrekare'].forEach(id => document.getElementById(id).value = '');
+        }
+    </script>
+</body>
+</html>
